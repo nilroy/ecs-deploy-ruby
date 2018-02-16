@@ -82,11 +82,11 @@ if __FILE__ == $PROGRAM_NAME
   valid_actions = %w[update]
   valid_environments = %w[staging perf production external management]
   opts = Trollop.options do
-    banner <<-EOS
+    banner <<-HERE
     Usage:
        #{$PROGRAM_NAME} [options]
        where [options] are:
-    EOS
+    HERE
     opt :region, 'Region', type: :string, default: 'us-east-1'
     opt :env, "Environment: #{valid_environments.join('/')}", type: :string, default: nil
     opt :config, 'Config file of the ecs cluster in YAML format', type: :string
