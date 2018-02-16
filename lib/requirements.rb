@@ -21,3 +21,4 @@ require 'pry-byebug'
 
 # internal requires
 require 'AWS/ecs'
+require 'exceptions'
