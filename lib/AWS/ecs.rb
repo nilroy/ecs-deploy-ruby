@@ -14,7 +14,7 @@ module AWS
     end
 
     def fetch_task_definition(task_definition:)
-      @ecs.describe_services(task_definition: task_definition).to_h
+      @ecs.describe_task_definition(task_definition: task_definition).to_h
     end
 
     def register_task_defintion(task_definition:)
