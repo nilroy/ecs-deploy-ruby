@@ -17,8 +17,8 @@ module AWS
       @ecs.describe_task_definition(task_definition: task_definition).to_h
     end
 
-    def register_task_defintion(task_definition:)
-      @ecs.register_task_defintion(task_definition).to_h
+    def register_task_definition(task_definition:)
+      @ecs.register_task_definition(task_definition).to_h
     end
 
     def update_service(cluster:, service:, task_defintion_arn:)
