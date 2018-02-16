@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ECS
+module LOGGER
   # Logger class
   class ECSLog
     include Singleton

@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-module ECS
+module AWS
   # Main class for ecs
   class ECS
     def initialize(env: nil, region: 'us-east-1')
-      @log = ECS::ECSLog.instance.log
+      @log = LOGGER::ECSLog.instance.log
       @env = env
       @ecs = Aws::ECS::Client.new(region: region)
     end
