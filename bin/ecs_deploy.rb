@@ -8,7 +8,6 @@
 $LOAD_PATH.unshift(File.dirname(__FILE__) + '/../lib') unless $LOAD_PATH.include?(File.dirname(__FILE__) + '/../lib')
 
 require 'requirements'
-require 'pry'
 
 # Class for deploying to ECS
 class EcsDeploy
@@ -63,9 +62,6 @@ class EcsDeploy
   def ecs_update
     services = @config[:services]
     services.each do |service|
-      binding.pry
-      puts service
-      next
       @log.info { "Updating service #{service}" }
       service_definition = @ecs.fetch_service_definition(cluster: @config[:ecs_cluster], service: service)
       running_task_definition_arn = service_definition[:services][0][:task_definition]
