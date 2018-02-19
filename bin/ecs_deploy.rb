@@ -77,7 +77,7 @@ class EcsDeploy
     Timeout.timeout(@timeout) do
       until newly_launched_tasks_running_count == desired_count
         remaining_tasks_to_start = desired_count - newly_launched_tasks_running_count
-        @log.info { "Service #{service_name} => { deployed_task_count => #{newly_launched_tasks_running_count}, remaining_tasks_to_deploy => #{remaining_tasks_to_start}, running_task_count => #{running_task_count} }" }
+        @log.info { "#{@env}: #{@config[:ecs_cluster]} : Service #{service_name} => { deployed_task_count => #{newly_launched_tasks_running_count}, remaining_tasks_to_deploy => #{remaining_tasks_to_start}, running_task_count => #{running_task_count} }" }
         running_tasks = []
         newly_launched_running_tasks = []
         running_task_arns = @ecs.list_tasks(cluster: @config[:ecs_cluster], service: service_name, desired_status: 'RUNNING')
