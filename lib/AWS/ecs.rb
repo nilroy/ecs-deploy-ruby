@@ -10,7 +10,7 @@ module AWS
     end
 
     def fetch_service_definition(cluster:, service:)
-      @ecs.describe_services(cluster: cluster, services: [service]).to_h
+      @ecs.describe_services(cluster: cluster, services: [service]).to_h[:services][0]
     end
 
     def fetch_task_definition(task_definition:)
