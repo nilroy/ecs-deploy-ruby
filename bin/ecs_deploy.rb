@@ -11,12 +11,13 @@ require 'requirements'
 
 # Class for deploying to ECS
 class EcsDeploy
-  def initialize(env:, config:, revision:, region: 'us-east-1', action: 'update')
+  def initialize(env:, config:, revision:, region: 'us-east-1', action: 'update', timeout:)
     @env = env
     @config = YAML.load_file(config)[@env.to_sym]
     @region = region
     @action = action
     @revision = revision
+    @timeout = timeout
     @log = LOGGER::ECSLog.instance.log
     @ecs = AWS::ECS.new(env: @env, region: region)
   end
@@ -53,27 +54,95 @@ class EcsDeploy
     task_defintion_clone
   end
 
-  def update_service(service:, task_definition:)
-    task_definition_arn = @ecs.register_task_definition(task_definition: task_definition)[:task_definition][:task_definition_arn]
+  def register_task_definition(task_definition:)
+    @ecs.register_task_definition(task_definition: task_definition)[:task_definition][:task_definition_arn]
+  end
+
+  def wait_for_task_deploy(service_name:, desired_count:, old_task_arns:)
+    running_tasks = []
+    newly_launched_running_tasks = []
+    running_task_arns = @ecs.list_tasks(cluster: @config[:ecs_cluster], service: service_name, desired_status: 'RUNNING')
+    running_task_arns.each do |task_arn|
+      task_status = @ecs.get_task_status(cluster: @config[:ecs_cluster], task_arn: task_arn)
+      running_tasks << task_arn if task_status == 'RUNNING'
+    end
+    newly_launched_tasks = running_task_arns - old_task_arns
+    newly_launched_tasks.each do |task_arn|
+      task_status = @ecs.get_task_status(cluster: @config[:ecs_cluster], task_arn: task_arn)
+      newly_launched_running_tasks << task_arn if task_status == 'RUNNING'
+    end
+    newly_launched_tasks_running_count = newly_launched_running_tasks.count
+    running_task_count = running_tasks.count
+
+    Timeout.timeout(@timeout) do
+      until newly_launched_tasks_running_count == desired_count
+        remaining_tasks_to_start = desired_count - newly_launched_tasks_running_count
+        @log.info { "Service #{service_name} => { deployed_task_count => #{newly_launched_tasks_running_count}, remaining_tasks_to_deploy => #{remaining_tasks_to_start}, running_task_count => #{running_task_count} }" }
+        running_tasks = []
+        newly_launched_running_tasks = []
+        running_task_arns = @ecs.list_tasks(cluster: @config[:ecs_cluster], service: service_name, desired_status: 'RUNNING')
+        running_task_arns.each do |task_arn|
+          task_status = @ecs.get_task_status(cluster: @config[:ecs_cluster], task_arn: task_arn)
+          running_tasks << task_arn if task_status == 'RUNNING'
+        end
+        newly_launched_tasks = running_task_arns - old_task_arns
+        newly_launched_tasks.each do |task_arn|
+          task_status = @ecs.get_task_status(cluster: @config[:ecs_cluster], task_arn: task_arn)
+          newly_launched_running_tasks << task_arn if task_status == 'RUNNING'
+        end
+        newly_launched_tasks_running_count = newly_launched_running_tasks.count
+        running_task_count = running_tasks.count
+        if newly_launched_tasks_running_count == desired_count
+          @log.info { "Service #{service_name} is deployed" }
+          break
+        end
+        sleep(10)
+      end
+    end
+  end
+
+  def wait_for_service_update_completion(service_info_maps:)
+    threads = []
+    service_info_maps.each do |service_info_map|
+      service_name = service_info_map['service_name']
+      desired_count = service_info_map['desired_count']
+      old_task_arns = service_info_map['running_task_arns']
+      t = Thread.new { wait_for_task_deploy(service_name: service_name, desired_count: desired_count, old_task_arns: old_task_arns) }
+      threads << t
+    end
+    threads.each(&:join)
+  end
+
+  def update_service(service:, task_definition_arn:)
     @log.info { "New task defintion for service => #{service} is #{task_definition_arn}" }
     @ecs.update_service(cluster: @config[:ecs_cluster], service: service, task_defintion_arn: task_definition_arn)
   end
 
   def ecs_update
     services = @config[:services]
+    service_info_maps = []
     services.each do |service|
       @log.info { "Updating service #{service}" }
       service_definition = @ecs.fetch_service_definition(cluster: @config[:ecs_cluster], service: service)
+      service_info_map = {}
+      service_info_map['service_name'] = service
+      service_info_map['desired_count'] = service_definition[:services][0][:desired_count]
       running_task_definition_arn = service_definition[:services][0][:task_definition]
+      running_task_arns = @ecs.list_tasks(cluster: @config[:ecs_cluster], service: service, desired_status: 'RUNNING')
+      service_info_map['running_task_arns'] = running_task_arns
       @log.info { "Running task definition for service => #{service} is #{running_task_definition_arn}" }
       task_definition = @ecs.fetch_task_definition(task_definition: running_task_definition_arn)
       container_definitions = task_definition[:task_definition][:container_definitions]
       new_container_definitions = modify_container_definition(container_definitions: container_definitions)
       @log.info { "Generating new task definition for service => #{service}" }
       new_task_definition = gen_task_definition(task_definition: task_definition, container_definitions: new_container_definitions)
-      update_service(service: service, task_definition: new_task_definition)
+      new_task_definition_arn = register_task_definition(task_definition: new_task_definition)
+      update_service(service: service, task_definition_arn: new_task_definition_arn)
       @log.info { "Service #{service} is updated..." }
+      service_info_maps << service_info_map
     end
+    wait_for_service_update_completion(service_info_maps: service_info_maps)
+    @log.info { "ECS cluster #{@config[:ecs_cluster]} is updated with latest revision" }
   end
 end
 
@@ -92,6 +161,7 @@ if __FILE__ == $PROGRAM_NAME
     opt :config, 'Config file of the ecs cluster in YAML format', type: :string
     opt :revision, 'Revision of the docker image', type: :string, default: 'latest'
     opt :action, "Action: #{valid_actions.join('/')}", type: :string, default: nil
+    opt :timeout, 'Timeout in seconds', type: :integer, default: 300
   end
 
   Trollop.die :env, "Provide valid environment! Choose from : #{valid_environments.join('/')}" \
@@ -107,6 +177,6 @@ if __FILE__ == $PROGRAM_NAME
                 unless opts[:config]
 
   ecs = EcsDeploy.new(env: opts[:env], region: opts[:region], action: opts[:action],
-                      config: opts[:config], revision: opts[:revision])
+                      config: opts[:config], revision: opts[:revision], timeout: opts[:timeout])
   ecs.main
 end
