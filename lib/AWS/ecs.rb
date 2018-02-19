@@ -24,5 +24,13 @@ module AWS
     def update_service(cluster:, service:, task_defintion_arn:)
       @ecs.update_service(cluster: cluster, service: service, task_definition: task_defintion_arn)
     end
+
+    def list_tasks(cluster:, service:, desired_status: 'RUNNING')
+      @ecs.list_tasks(cluster: cluster, service_name: service, desired_status: desired_status).to_h[:task_arns]
+    end
+
+    def get_task_status(cluster:, task_arn:)
+      @ecs.describe_tasks(cluster: cluster, tasks: [task_arn]).to_h[:tasks][0][:last_status]
+    end
   end
 end
