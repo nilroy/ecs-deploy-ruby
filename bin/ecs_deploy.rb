@@ -122,7 +122,7 @@ class EcsDeploy
     services = @config[:services]
     service_info_maps = []
     services.each do |service|
-      @log.info { "Updating service #{service}" }
+      @log.info { "Updating service #{service} in #{@config[:ecs_cluster]}" }
       service_definition = @ecs.fetch_service_definition(cluster: @config[:ecs_cluster], service: service)
       service_info_map = {}
       service_info_map['service_name'] = service
