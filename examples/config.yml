@@ -1,0 +1,138 @@
+:defaults: &defaults
+  :exclude_container:
+    -
+  :exclude_service:
+    -
+:staging:
+  <<: *defaults
+  :ecs_cluster: 'staging-httpd'
+  :services:
+    -
+      service_name: httpd
+      desired_count: 1
+      deployment_configuration:
+        maximum_percent: 100
+        minimum_healthy_percent: 0
+      launch_type: EC2
+      task_definition:
+        family: staging-httpd
+        network_mode: host
+        container_definitions:
+          -
+            name: simple-app'
+            image: 'httpd:2.4'
+            cpu: 1024
+            memory: 1024
+            port_mappings:
+              -
+                container_port: 80
+                host_port: 80
+                protocol: tcp
+        essential: true
+        requires_compatibilities:
+          - EC2
+    -
+      service_name: httpd-fargate
+      desired_count: 1
+      deployment_configuration:
+        maximum_percent: 100
+        minimum_healthy_percent: 0
+      launch_type: FARGATE
+      network_configuration:
+        awsvpc_configuration:
+          subnets:
+            - '<AWS vpc subnet ID for az1>'
+            - '<AWS vpc subnet ID for az2>'
+          security_groups:
+            - '<security_group_id>'
+          assign_public_ip: DISABLED
+      task_definition:
+        family: staging-httpd-fargate
+        task_role_arn: '<AWS IAM role>'
+        execution_role_arn: '<AWS IAM role>'
+        network_mode: awsvpc
+        container_definitions:
+          -
+            name: simple-app-fargate
+            image: 'httpd:2.4'
+            cpu: 1024
+            memory: 2048
+            port_mappings:
+              -
+                container_port: 80
+                host_port: 80
+                protocol: tcp
+        essential: true
+        requires_compatibilities:
+          - FARGATE
+        cpu: 1024
+        memory: 2048
+:perf:
+  <<: *defaults
+  :ecs_cluster: 'perf-httpd'
+  :services:
+    -
+      service_name: httpd
+      desired_count: 1
+      deployment_configuration:
+        maximum_percent: 100
+        minimum_healthy_percent: 0
+      launch_type: EC2
+      task_definition:
+        family: perf-httpd
+        network_mode: host
+        container_definitions:
+          -
+            name: simple-app'
+            image: 'httpd:2.4'
+            cpu: 1024
+            memory: 1024
+            port_mappings:
+              -
+                container_port: 80
+                host_port: 80
+                protocol: tcp
+        essential: true
+        requires_compatibilities:
+          - EC2
+    -
+      service_name: httpd-fargate
+      desired_count: 1
+      deployment_configuration:
+        maximum_percent: 100
+        minimum_healthy_percent: 0
+      launch_type: FARGATE
+      network_configuration:
+        awsvpc_configuration:
+          subnets:
+            - '<AWS vpc subnet ID for az1>'
+            - '<AWS vpc subnet ID for az2>'
+          security_groups:
+            - '<security_group_id>'
+          assign_public_ip: DISABLED
+      task_definition:
+        family: perf-httpd-fargate
+        task_role_arn: '<AWS IAM role>'
+        execution_role_arn: '<AWS IAM role>'
+        network_mode: awsvpc
+        container_definitions:
+          -
+            name: simple-app-fargate
+            image: 'httpd:2.4'
+            cpu: 1024
+            memory: 2048
+            port_mappings:
+              -
+                container_port: 80
+                host_port: 80
+                protocol: tcp
+        essential: true
+        requires_compatibilities:
+          - FARGATE
+        cpu: 1024
+        memory: 2048
+
+
+:production:
+  <<: *defaults
+  :ecs_cluster: 'production-httpd'
