@@ -1,7 +1,23 @@
 ## ecs-deploy-ruby
+
+### Prerequisites
+The tool use aws-sdk version 3.
+Clone the repo and run 
+
+```
+bundle install
+```
+Set following AWS environmental variables
+
+- AWS\_ACCESS\_KEY\_ID
+- AWS\_SECRET\_KEY
+- AWS\_SECRET\_ACCESS\_KEY
+
+## Supported actions
+
 Currently the tool supports following actions:
 
-- update of ECS service with new docker image of container running in a task
+- update of ECS service/ multiple ECS services with new docker image of container running in a task (Supports FARGATE)
 - create a ecs-cluster
 
 ## Sample config.yml file
