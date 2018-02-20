@@ -3,6 +3,7 @@
     -
   :exclude_service:
     -
+  :image_repo: 'httpd'
 :staging:
   <<: *defaults
   :ecs_cluster: 'staging-httpd'
