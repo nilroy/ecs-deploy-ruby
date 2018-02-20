@@ -10,7 +10,14 @@ module AWS
     end
 
     def fetch_service_definition(cluster:, service:)
-      @ecs.describe_services(cluster: cluster, services: [service]).to_h[:services][0]
+      service_def = @ecs.describe_services(cluster: cluster, services: [service]).to_h[:services][0]
+      status = service_def[:status]
+      case status
+      when 'ACTIVE'
+        service_def
+      when 'INACTIVE'
+        raise AwsECS::EcsException, "Service #{service} is INACTIVE"
+      end
     end
 
     def fetch_task_definition(task_definition:)
