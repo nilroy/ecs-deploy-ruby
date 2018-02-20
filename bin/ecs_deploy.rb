@@ -58,7 +58,8 @@ class EcsDeploy
     @ecs.register_task_definition(task_definition: task_definition)[:task_definition][:task_definition_arn]
   end
 
-  def wait_for_task_deploy(service_name:, desired_count:, old_task_arns:)
+  def wait_for_task_deploy(service_name:, old_task_arns:)
+    desired_count = @ecs.fetch_service_definition(cluster: @config[:ecs_cluster], service: service_name)[:desired_count]
     running_tasks = []
     newly_launched_running_tasks = []
     running_task_arns = @ecs.list_tasks(cluster: @config[:ecs_cluster], service: service_name, desired_status: 'RUNNING')
@@ -77,7 +78,7 @@ class EcsDeploy
     Timeout.timeout(@timeout) do
       until newly_launched_tasks_running_count == desired_count
         remaining_tasks_to_start = desired_count - newly_launched_tasks_running_count
-        @log.info { "Environment => #{@env}, Cluster => #{@config[:ecs_cluster]}, Service #{service_name} => { deployed_task_count => #{newly_launched_tasks_running_count}, remaining_tasks_to_deploy => #{remaining_tasks_to_start}, running_task_count => #{running_task_count} }" }
+        @log.info { "Environment => #{@env}, Cluster => #{@config[:ecs_cluster]}, Service #{service_name} => { desired_count=> #{desired_count}, deployed_task_count => #{newly_launched_tasks_running_count}, remaining_tasks_to_deploy => #{remaining_tasks_to_start}, running_task_count => #{running_task_count} }" }
         running_tasks = []
         newly_launched_running_tasks = []
         running_task_arns = @ecs.list_tasks(cluster: @config[:ecs_cluster], service: service_name, desired_status: 'RUNNING')
@@ -97,6 +98,7 @@ class EcsDeploy
           break
         end
         sleep(10)
+        desired_count = @ecs.fetch_service_definition(cluster: @config[:ecs_cluster], service: service_name)[:desired_count]
       end
     end
   end
@@ -105,9 +107,8 @@ class EcsDeploy
     threads = []
     service_info_maps.each do |service_info_map|
       service_name = service_info_map['service_name']
-      desired_count = service_info_map['desired_count']
       old_task_arns = service_info_map['running_task_arns']
-      t = Thread.new { wait_for_task_deploy(service_name: service_name, desired_count: desired_count, old_task_arns: old_task_arns) }
+      t = Thread.new { wait_for_task_deploy(service_name: service_name, old_task_arns: old_task_arns) }
       threads << t
     end
     threads.each(&:join)
@@ -126,8 +127,7 @@ class EcsDeploy
       service_definition = @ecs.fetch_service_definition(cluster: @config[:ecs_cluster], service: service)
       service_info_map = {}
       service_info_map['service_name'] = service
-      service_info_map['desired_count'] = service_definition[:services][0][:desired_count]
-      running_task_definition_arn = service_definition[:services][0][:task_definition]
+      running_task_definition_arn = service_definition[:task_definition]
       running_task_arns = @ecs.list_tasks(cluster: @config[:ecs_cluster], service: service, desired_status: 'RUNNING')
       service_info_map['running_task_arns'] = running_task_arns
       @log.info { "Running task definition for service => #{service} is #{running_task_definition_arn}" }
