@@ -33,8 +33,8 @@ class EcsDeploy
 
   def main
     case @action
-    when 'update'
-      ecs_update
+    when 'update-image'
+      ecs_image_update
     else
       puts 'Invalid action'
     end
@@ -42,19 +42,39 @@ class EcsDeploy
     @log.error(e.message)
   end
 
-  def modify_container_definition(container_definitions:)
+  def gen_service_task_map
+    service_task_map = []
+    @config[:services].each do |service|
+      map = {}
+      map['task_definition'] = service.delete('task_definition')
+      map['service_definition'] = service
+      service_task_map << map
+    end
+    service_task_map
+  end
+
+  def get_image_repo(image:)
+    img = image.split('/')
+    i = img.delete(img.last)
+    image_name = i.split(':').first
+    img << image_name
+    img_repo = img.join('/')
+    img_repo
+  end
+
+  def modify_container_image(container_definitions:)
     new_container_definitions = []
     container_definitions.each do |container_definition|
       container_definition_clone = container_definition.clone
-      next if @config[:exclude_containers].include?(container_definition_clone[:name])
-      container_definition_clone[:image] = "#{@config[:image_repo]}:#{@revision}"
+      image_repo = @config.key?(:image_repo) ? @config[:image_repo] : get_image_repo(image: container_definition_clone[:image])
+      container_definition_clone[:image] = "#{image_repo}:#{@revision}"
       @log.info { "Modified the image for container #{container_definition_clone[:name]} to use revision => #{@revision}" }
       new_container_definitions << container_definition_clone
     end
     new_container_definitions
   end
 
-  def gen_task_definition(task_definition:, container_definitions:)
+  def gen_task_definition_from_container_definition(task_definition:, container_definitions:)
     task_defintion_clone = task_definition[:task_definition].clone
     %i[task_definition_arn container_definitions revision status compatibilities requires_attributes].each do |r|
       task_defintion_clone.delete(r)
@@ -128,8 +148,9 @@ class EcsDeploy
     @ecs.update_service(cluster: @config[:ecs_cluster], service: service, task_defintion_arn: task_definition_arn)
   end
 
-  def ecs_update
-    services = @config[:services]
+  def ecs_image_update
+    services = @config[:services].collect { |c| c['service_name'] }
+    services.reject! { |service| @exclude_service.include?(service) }
     service_info_maps = []
     services.each do |service|
       @log.info { "Updating service #{service} in #{@config[:ecs_cluster]}" }
@@ -143,9 +164,11 @@ class EcsDeploy
         @log.info { "Running task definition for service => #{service} is #{running_task_definition_arn}" }
         task_definition = @ecs.fetch_task_definition(task_definition: running_task_definition_arn)
         container_definitions = task_definition[:task_definition][:container_definitions]
-        new_container_definitions = modify_container_definition(container_definitions: container_definitions)
+        container_definitions.reject! { |container| @exclude_container.include?(container[:name]) }
+        next if container_definitions.empty?
+        new_container_definitions = modify_container_image(container_definitions: container_definitions, service_name: service)
         @log.info { "Generating new task definition for service => #{service}" }
-        new_task_definition = gen_task_definition(task_definition: task_definition, container_definitions: new_container_definitions)
+        new_task_definition = gen_task_definition_from_container_definition(task_definition: task_definition, container_definitions: new_container_definitions)
         new_task_definition_arn = register_task_definition(task_definition: new_task_definition)
         update_service(service: service, task_definition_arn: new_task_definition_arn)
         @log.info { "Service #{service} is updated..." }
