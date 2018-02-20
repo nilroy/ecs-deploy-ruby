@@ -20,6 +20,10 @@ module AWS
       end
     end
 
+    def create_cluster(cluster_name:)
+      @ecs.create_cluster(cluster_name: cluster_name)
+    end
+
     def fetch_task_definition(task_definition:)
       @ecs.describe_task_definition(task_definition: task_definition).to_h
     end

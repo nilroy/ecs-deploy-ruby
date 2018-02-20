@@ -1,14 +1,25 @@
 ## ecs-deploy-ruby
-Currently the tool supports update of ECS service with new docker image of container. It requires a config file in YML format. AN example config file:
+Currently the tool supports following actions:
+
+- update of ECS service with new docker image of container running in a task
+- create a ecs-cluster
+
+## Sample config.yml file
+
+The tool requires a config file in YML format. An example config file:
 
 ```
 :defaults: &defaults
-  :services:
-    - service1
-    - service2
-  :exclude_containers:
+  :exclude_container:
     -
-  :image_repo: '<AWS account id>.dkr.ecr.<AWS region>.amazonaws.com/<repository_name>'
+  :exclude_service:
+    -
+  :image_repo: '<docker_image_repo>'
+  :services:
+    -
+      service_name: service1
+    -
+      service_name: service2
 
 :staging:
   <<: *defaults
@@ -24,8 +35,16 @@ Currently the tool supports update of ECS service with new docker image of conta
 
 ```
 
-# How to run
+# Operations
+## Create ecs-cluster
+```
+bundle exec bin/ecs_deploy.rb --env perf --config <path to config file> --action create-cluster
+```
+## Updating image of a running task
 
 ```
-bundle exec bin/ecs_deploy.rb --env perf --config <path to config file> --revision <revision to deploy> --action update
+bundle exec bin/ecs_deploy.rb --env perf --config <path to config file> --revision <revision to deploy> --action update-image
 ```
+
+# Future development
+In future the tool will be able to do more stuff. The example directory contains a reference config.yml file that contains stuff which will be used in future releases of the tool.
