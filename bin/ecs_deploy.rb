@@ -14,11 +14,11 @@ class EcsDeploy
   def initialize(env:, config:, revision:, region: 'us-east-1', action: 'update', timeout:, exclude_container: nil, exclude_service: nil)
     @env = env
     @config = YAML.load_file(config)[@env.to_sym]
-    @exclude_container = exclude_container.split(',')
+    @exclude_container = exclude_container.nil? ? [] : exclude_container.split(',')
     @exclude_container << @config[:exclude_container]
     @exclude_container.flatten!
     @exclude_container.uniq!
-    @exclude_service = exclude_service.split(',')
+    @exclude_service = exclude_service.nil? ? [] : exclude_service.split(',')
     @exclude_service << @config[:exclude_service]
     @exclude_service.flatten!
     @exclude_service.uniq!
@@ -35,6 +35,20 @@ class EcsDeploy
     case @action
     when 'update-image'
       ecs_image_update
+    when 'update-task'
+      ecs_update_task
+    when 'update-service'
+      ecs_update_service
+    when 'create-cluster'
+      ecs_create_cluster
+    when 'create-task'
+      ecs_create_task
+    when 'create-service'
+      ecs_create_service
+    when 'create-all'
+      ecs_create_cluster
+      ecs_create_task
+      ecs_create_service
     else
       puts 'Invalid action'
     end
@@ -180,6 +194,26 @@ class EcsDeploy
     end
     wait_for_service_update_completion(service_info_maps: service_info_maps)
     @log.info { "ECS cluster #{@config[:ecs_cluster]} is updated with latest revision" }
+  end
+
+  def ecs_create_cluster
+    @ecs.create_cluster(cluster_name: @config[:ecs_cluster])
+  end
+
+  def ecs_update_task
+    raise 'Not Implemented'
+  end
+
+  def ecs_update_service
+    raise 'Not implemented'
+  end
+
+  def ecs_create_task
+    raise 'Not implemented'
+  end
+
+  def ecs_create_service
+    raise 'Not implemented'
   end
 end
 
