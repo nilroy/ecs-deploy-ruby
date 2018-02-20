@@ -29,7 +29,7 @@ class EcsDeploy
     else
       puts 'Invalid action'
     end
-  rescue ECS::EcsException => e
+  rescue AwsECS::EcsException => e
     @log.error(e.message)
   end
 
@@ -124,22 +124,27 @@ class EcsDeploy
     service_info_maps = []
     services.each do |service|
       @log.info { "Updating service #{service} in #{@config[:ecs_cluster]}" }
-      service_definition = @ecs.fetch_service_definition(cluster: @config[:ecs_cluster], service: service)
-      service_info_map = {}
-      service_info_map['service_name'] = service
-      running_task_definition_arn = service_definition[:task_definition]
-      running_task_arns = @ecs.list_tasks(cluster: @config[:ecs_cluster], service: service, desired_status: 'RUNNING')
-      service_info_map['running_task_arns'] = running_task_arns
-      @log.info { "Running task definition for service => #{service} is #{running_task_definition_arn}" }
-      task_definition = @ecs.fetch_task_definition(task_definition: running_task_definition_arn)
-      container_definitions = task_definition[:task_definition][:container_definitions]
-      new_container_definitions = modify_container_definition(container_definitions: container_definitions)
-      @log.info { "Generating new task definition for service => #{service}" }
-      new_task_definition = gen_task_definition(task_definition: task_definition, container_definitions: new_container_definitions)
-      new_task_definition_arn = register_task_definition(task_definition: new_task_definition)
-      update_service(service: service, task_definition_arn: new_task_definition_arn)
-      @log.info { "Service #{service} is updated..." }
-      service_info_maps << service_info_map
+      begin
+        service_definition = @ecs.fetch_service_definition(cluster: @config[:ecs_cluster], service: service)
+        service_info_map = {}
+        service_info_map['service_name'] = service
+        running_task_definition_arn = service_definition[:task_definition]
+        running_task_arns = @ecs.list_tasks(cluster: @config[:ecs_cluster], service: service, desired_status: 'RUNNING')
+        service_info_map['running_task_arns'] = running_task_arns
+        @log.info { "Running task definition for service => #{service} is #{running_task_definition_arn}" }
+        task_definition = @ecs.fetch_task_definition(task_definition: running_task_definition_arn)
+        container_definitions = task_definition[:task_definition][:container_definitions]
+        new_container_definitions = modify_container_definition(container_definitions: container_definitions)
+        @log.info { "Generating new task definition for service => #{service}" }
+        new_task_definition = gen_task_definition(task_definition: task_definition, container_definitions: new_container_definitions)
+        new_task_definition_arn = register_task_definition(task_definition: new_task_definition)
+        update_service(service: service, task_definition_arn: new_task_definition_arn)
+        @log.info { "Service #{service} is updated..." }
+        service_info_maps << service_info_map
+      rescue AwsECS::EcsException => e
+        msg = format('OOPs!! Update of service %{service} failed!! Reason: %{reason}', service: service, reason: e.message)
+        raise AwsECS::EcsException, msg
+      end
     end
     wait_for_service_update_completion(service_info_maps: service_info_maps)
     @log.info { "ECS cluster #{@config[:ecs_cluster]} is updated with latest revision" }

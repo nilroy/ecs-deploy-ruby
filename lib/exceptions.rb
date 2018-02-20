@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ECS
+module AwsECS
   class EcsException < RuntimeError
   end
 
