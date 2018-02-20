@@ -180,7 +180,7 @@ class EcsDeploy
         container_definitions = task_definition[:task_definition][:container_definitions]
         container_definitions.reject! { |container| @exclude_container.include?(container[:name]) }
         next if container_definitions.empty?
-        new_container_definitions = modify_container_image(container_definitions: container_definitions, service_name: service)
+        new_container_definitions = modify_container_image(container_definitions: container_definitions)
         @log.info { "Generating new task definition for service => #{service}" }
         new_task_definition = gen_task_definition_from_container_definition(task_definition: task_definition, container_definitions: new_container_definitions)
         new_task_definition_arn = register_task_definition(task_definition: new_task_definition)
