@@ -11,9 +11,18 @@ require 'requirements'
 
 # Class for deploying to ECS
 class EcsDeploy
-  def initialize(env:, config:, revision:, region: 'us-east-1', action: 'update', timeout:)
+  def initialize(env:, config:, revision:, region: 'us-east-1', action: 'update', timeout:, exclude_container: nil, exclude_service: nil)
     @env = env
     @config = YAML.load_file(config)[@env.to_sym]
+    @exclude_container = exclude_container.split(',')
+    @exclude_container << @config[:exclude_container]
+    @exclude_container.flatten!
+    @exclude_container.uniq!
+    @exclude_service = exclude_service.split(',')
+    @exclude_service << @config[:exclude_service]
+    @exclude_service.flatten!
+    @exclude_service.uniq!
+    @service_task_map = gen_service_task_map
     @region = region
     @action = action
     @revision = revision
@@ -153,7 +162,7 @@ end
 
 if __FILE__ == $PROGRAM_NAME
 
-  valid_actions = %w[update]
+  valid_actions = %w[update-image update-service update-task create-cluster create-task create-service create-all]
   valid_environments = %w[staging perf production external management]
   opts = Trollop.options do
     banner <<-HERE
@@ -167,6 +176,8 @@ if __FILE__ == $PROGRAM_NAME
     opt :revision, 'Revision of the docker image', type: :string, default: 'latest'
     opt :action, "Action: #{valid_actions.join('/')}", type: :string, default: nil
     opt :timeout, 'Timeout in seconds', type: :integer, default: 300
+    opt :exclude_container, 'Comma separated list of containers to exclude from being updated', type: :string, default: nil
+    opt :exclude_service, 'Comma separated list of services to exclude from being updated', type: :string, default: nil
   end
 
   Trollop.die :env, "Provide valid environment! Choose from : #{valid_environments.join('/')}" \
@@ -176,12 +187,14 @@ if __FILE__ == $PROGRAM_NAME
                 unless valid_actions.include?(opts[:action])
 
   Trollop.die :revision, 'Provide docker image revision' \
-                unless opts[:revision]
+                unless opts[:revision] || \
+                       opts[:action] == 'update-image'
 
   Trollop.die :config, 'Provide config file path for the ecs cluster' \
                 unless opts[:config]
 
   ecs = EcsDeploy.new(env: opts[:env], region: opts[:region], action: opts[:action],
-                      config: opts[:config], revision: opts[:revision], timeout: opts[:timeout])
+                      config: opts[:config], revision: opts[:revision], timeout: opts[:timeout],
+                      exclude_service: opts[:exclude_service], exclude_container: opts[:exclude_container])
   ecs.main
 end
