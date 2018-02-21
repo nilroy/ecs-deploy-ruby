@@ -68,9 +68,9 @@
             :log_configuration:
               :log_driver: awslogs
               :options:
-                'awslogs-group': '/ecs/staging-httpd'
-                'awslogs-region': 'us-east-1'
-                'awslogs-stream-prefix': 'ecs'
+                awslogs-group: /ecs/staging-httpd
+                awslogs-region: us-east-1
+                awslogs-stream-prefix: ecs
         :requires_compatibilities:
           - FARGATE
         :cpu: '1024'
