@@ -11,7 +11,8 @@ require 'requirements'
 
 # Class for deploying to ECS
 class EcsDeploy
-  def initialize(env:, config:, revision:, region: 'us-east-1', action: 'update', timeout:, exclude_container: nil, exclude_service: nil)
+  def initialize(env:, config:, revision:, region: 'us-east-1', action: 'update', timeout:,
+                 service:, container:, exclude_container: nil, exclude_service: nil)
     @env = env
     @config = YAML.load_file(config)[@env.to_sym]
     @exclude_container = exclude_container.nil? ? [] : exclude_container.split(',')
@@ -22,6 +23,8 @@ class EcsDeploy
     @exclude_service << @config[:exclude_service]
     @exclude_service.flatten!
     @exclude_service.uniq!
+    @service = service
+    @container = container
     @service_task_map = gen_service_task_map
     @region = region
     @action = action
@@ -41,13 +44,10 @@ class EcsDeploy
       ecs_update_service
     when 'create-cluster'
       ecs_create_cluster
-    when 'create-task'
-      ecs_create_task
     when 'create-service'
       ecs_create_service
-    when 'create-all'
+    when 'create'
       ecs_create_cluster
-      ecs_create_task
       ecs_create_service
     else
       puts 'Invalid action'
@@ -60,7 +60,7 @@ class EcsDeploy
     service_task_map = []
     @config[:services].each do |service|
       map = {}
-      map['task_definition'] = service.delete('task_definition')
+      map['task_definition'] = service.delete(:task_definition)
       map['service_definition'] = service
       service_task_map << map
     end
@@ -163,8 +163,9 @@ class EcsDeploy
   end
 
   def ecs_image_update
-    services = @config[:services].collect { |c| c['service_name'] }
+    services = @service ? [@service] : @config[:services].collect { |c| c[:service_name] }
     services.reject! { |service| @exclude_service.include?(service) }
+    @log.error { 'No service to deploy!' } if services.empty?
     service_info_maps = []
     services.each do |service|
       @log.info { "Updating service #{service} in #{@config[:ecs_cluster]}" }
@@ -178,6 +179,7 @@ class EcsDeploy
         @log.info { "Running task definition for service => #{service} is #{running_task_definition_arn}" }
         task_definition = @ecs.fetch_task_definition(task_definition: running_task_definition_arn)
         container_definitions = task_definition[:task_definition][:container_definitions]
+        container_definitions.select! { |container| container['name'] == @container } if @container
         container_definitions.reject! { |container| @exclude_container.include?(container[:name]) }
         next if container_definitions.empty?
         new_container_definitions = modify_container_image(container_definitions: container_definitions)
@@ -197,6 +199,7 @@ class EcsDeploy
   end
 
   def ecs_create_cluster
+    @log.info { "Creating ecs cluster #{@config[:ecs_cluster]}" }
     @ecs.create_cluster(cluster_name: @config[:ecs_cluster])
   end
 
@@ -208,18 +211,29 @@ class EcsDeploy
     raise 'Not implemented'
   end
 
-  def ecs_create_task
-    raise 'Not implemented'
-  end
-
   def ecs_create_service
-    raise 'Not implemented'
+    @service_task_map.each do |m|
+      service_definition = m['service_definition']
+      task_definition = m['task_definition']
+      service_name = service_definition[:service_name]
+      @log.info { "Registering task definition for service => #{service_name}" }
+      task_definition_arn = register_task_definition(task_definition: task_definition)
+      @log.info { "Searching for service #{service_name} in ecs cluster => #{@config[:ecs_cluster]}" }
+      resp = @ecs.describe_service(cluster: @config[:ecs_cluster], service_name: service_name)
+      unless resp[:services].empty?
+        @log.info { "Service => #{service_name} found in ecs cluster => #{@config[:ecs_cluster]}. Skipping service creation" }
+        next
+      end
+      @log.info { "Service #{service_name} not found in ecs cluster => #{@config[:ecs_cluster]}" }
+      @log.info { "Creating service => #{service_name}" }
+      @ecs.create_service(cluster: @config[:ecs_cluster], task_definition_arn: task_definition_arn, service_definition: service_definition)
+    end
   end
 end
 
 if __FILE__ == $PROGRAM_NAME
 
-  valid_actions = %w[update-image update-service update-task create-cluster create-task create-service create-all]
+  valid_actions = %w[update-image update-service update-task create-cluster create-service create]
   valid_environments = %w[staging perf production external management]
   opts = Trollop.options do
     banner <<-HERE
@@ -235,6 +249,8 @@ if __FILE__ == $PROGRAM_NAME
     opt :timeout, 'Timeout in seconds', type: :integer, default: 300
     opt :exclude_container, 'Comma separated list of containers to exclude from being updated', type: :string, default: nil
     opt :exclude_service, 'Comma separated list of services to exclude from being updated', type: :string, default: nil
+    opt :service, 'Service to update', type: :string, default: nil
+    opt :container, 'Container to update', type: :string, default: nil
   end
 
   Trollop.die :env, "Provide valid environment! Choose from : #{valid_environments.join('/')}" \
@@ -252,6 +268,7 @@ if __FILE__ == $PROGRAM_NAME
 
   ecs = EcsDeploy.new(env: opts[:env], region: opts[:region], action: opts[:action],
                       config: opts[:config], revision: opts[:revision], timeout: opts[:timeout],
-                      exclude_service: opts[:exclude_service], exclude_container: opts[:exclude_container])
+                      exclude_service: opts[:exclude_service], exclude_container: opts[:exclude_container],
+                      service: opts[:service], container: opts[:container])
   ecs.main
 end

@@ -20,6 +20,10 @@ module AWS
       end
     end
 
+    def describe_service(cluster:, service_name:)
+      @ecs.describe_services(cluster: cluster, services: [service_name]).to_h
+    end
+
     def create_cluster(cluster_name:)
       @ecs.create_cluster(cluster_name: cluster_name)
     end
@@ -42,6 +46,14 @@ module AWS
 
     def get_task_status(cluster:, task_arn:)
       @ecs.describe_tasks(cluster: cluster, tasks: [task_arn]).to_h[:tasks][0][:last_status]
+    end
+
+    def create_service(cluster:, service_definition:, task_definition_arn:)
+      params = {}
+      params[:cluster] = cluster
+      params[:task_definition] = task_definition_arn
+      params.merge!(service_definition)
+      @ecs.create_service(params)
     end
   end
 end
