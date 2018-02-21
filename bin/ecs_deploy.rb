@@ -8,7 +8,6 @@
 $LOAD_PATH.unshift(File.dirname(__FILE__) + '/../lib') unless $LOAD_PATH.include?(File.dirname(__FILE__) + '/../lib')
 
 require 'requirements'
-require 'pry'
 
 # Class for deploying to ECS
 class EcsDeploy
@@ -221,7 +220,7 @@ class EcsDeploy
       task_definition_arn = register_task_definition(task_definition: task_definition)
       @log.info { "Searching for service #{service_name} in ecs cluster => #{@config[:ecs_cluster]}" }
       resp = @ecs.describe_service(cluster: @config[:ecs_cluster], service_name: service_name)
-      unless resp[:services].nil?
+      unless resp[:services].empty?
         @log.info { "Service => #{service_name} found in ecs cluster => #{@config[:ecs_cluster]}. Skipping service creation" }
         next
       end
