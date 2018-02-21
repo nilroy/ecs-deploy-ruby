@@ -82,7 +82,7 @@ class EcsDeploy
       container_definition_clone = container_definition.clone
       image_repo = @config.key?(:image_repo) ? @config[:image_repo] : get_image_repo(image: container_definition_clone[:image])
       container_definition_clone[:image] = "#{image_repo}:#{@revision}"
-      @log.info { "Modified the image for container #{container_definition_clone[:name]} to use revision => #{@revision}" }
+      @log.info { "Modified the image for container #{container_definition_clone[:name]} to use revision : #{@revision}" }
       new_container_definitions << container_definition_clone
     end
     new_container_definitions
@@ -121,7 +121,7 @@ class EcsDeploy
     Timeout.timeout(@timeout) do
       until newly_launched_tasks_running_count == desired_count
         remaining_tasks_to_start = desired_count - newly_launched_tasks_running_count
-        @log.info { "Environment => #{@env}, Cluster => #{@config[:ecs_cluster]}, Service #{service_name} => { desired_count => #{desired_count}, deployed_task_count => #{newly_launched_tasks_running_count}, remaining_tasks_to_deploy => #{remaining_tasks_to_start}, running_task_count => #{running_task_count} }" }
+        @log.info { "Environment : #{@env}, Cluster : #{@config[:ecs_cluster]}, Service #{service_name} : { desired_count : #{desired_count}, deployed_task_count : #{newly_launched_tasks_running_count}, remaining_tasks_to_deploy : #{remaining_tasks_to_start}, running_task_count : #{running_task_count} }" }
         running_tasks = []
         newly_launched_running_tasks = []
         running_task_arns = @ecs.list_tasks(cluster: @config[:ecs_cluster], service: service_name, desired_status: 'RUNNING')
@@ -158,7 +158,7 @@ class EcsDeploy
   end
 
   def update_service(service:, task_definition_arn:)
-    @log.info { "New task defintion for service => #{service} is #{task_definition_arn}" }
+    @log.info { "New task defintion for service : #{service} is #{task_definition_arn}" }
     @ecs.update_service(cluster: @config[:ecs_cluster], service: service, task_defintion_arn: task_definition_arn)
   end
 
@@ -176,14 +176,14 @@ class EcsDeploy
         running_task_definition_arn = service_definition[:task_definition]
         running_task_arns = @ecs.list_tasks(cluster: @config[:ecs_cluster], service: service, desired_status: 'RUNNING')
         service_info_map['running_task_arns'] = running_task_arns
-        @log.info { "Running task definition for service => #{service} is #{running_task_definition_arn}" }
+        @log.info { "Running task definition for service : #{service} is #{running_task_definition_arn}" }
         task_definition = @ecs.fetch_task_definition(task_definition: running_task_definition_arn)
         container_definitions = task_definition[:task_definition][:container_definitions]
         container_definitions.select! { |container| container['name'] == @container } if @container
         container_definitions.reject! { |container| @exclude_container.include?(container[:name]) }
         next if container_definitions.empty?
         new_container_definitions = modify_container_image(container_definitions: container_definitions)
-        @log.info { "Generating new task definition for service => #{service}" }
+        @log.info { "Generating new task definition for service : #{service}" }
         new_task_definition = gen_task_definition_from_container_definition(task_definition: task_definition, container_definitions: new_container_definitions)
         new_task_definition_arn = register_task_definition(task_definition: new_task_definition)
         update_service(service: service, task_definition_arn: new_task_definition_arn)
@@ -216,16 +216,17 @@ class EcsDeploy
       service_definition = m['service_definition']
       task_definition = m['task_definition']
       service_name = service_definition[:service_name]
-      @log.info { "Registering task definition for service => #{service_name}" }
+      @log.info { "Registering task definition for service : #{service_name}" }
       task_definition_arn = register_task_definition(task_definition: task_definition)
-      @log.info { "Searching for service #{service_name} in ecs cluster => #{@config[:ecs_cluster]}" }
+      @log.info { "New task definition ARN for service #{service_name} is #{task_definition_arn}" }
+      @log.info { "Searching for service #{service_name} in ecs cluster  #{@config[:ecs_cluster]}" }
       resp = @ecs.describe_service(cluster: @config[:ecs_cluster], service_name: service_name)
       unless resp[:services].empty?
-        @log.info { "Service => #{service_name} found in ecs cluster => #{@config[:ecs_cluster]}. Skipping service creation" }
+        @log.info { "Service : #{service_name} found in ecs cluster #{@config[:ecs_cluster]}. Skipping service creation" }
         next
       end
-      @log.info { "Service #{service_name} not found in ecs cluster => #{@config[:ecs_cluster]}" }
-      @log.info { "Creating service => #{service_name}" }
+      @log.info { "Service #{service_name} not found in ecs cluster #{@config[:ecs_cluster]}" }
+      @log.info { "Creating service : #{service_name}" }
       @ecs.create_service(cluster: @config[:ecs_cluster], task_definition_arn: task_definition_arn, service_definition: service_definition)
     end
   end
