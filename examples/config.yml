@@ -8,14 +8,15 @@
 :staging:
   <<: *defaults
   :ecs_cluster: 'staging-httpd'
-  :services:
+  :cluster_definition:
     -
-      :service_name: httpd
-      :desired_count: 1
-      :deployment_configuration:
-        :maximum_percent: 100
-        :minimum_healthy_percent: 0
-      :launch_type: EC2
+      :service_definition:
+        :service_name: httpd
+        :desired_count: 1
+        :deployment_configuration:
+          :maximum_percent: 100
+          :minimum_healthy_percent: 0
+        :launch_type: EC2
       :task_definition:
         :family: staging-httpd
         :network_mode: host
@@ -34,20 +35,21 @@
         :requires_compatibilities:
           - EC2
     -
-      :service_name: httpd-fargate
-      :desired_count: 1
-      :deployment_configuration:
-        :maximum_percent: 100
-        :minimum_healthy_percent: 0
-      :launch_type: FARGATE
-      :network_configuration:
-        :awsvpc_configuration:
-          :subnets:
-            - subnet-xxxxxxxx
-            - subnet-yyyyyyyy
-          :security_groups:
-            - sg-zzzzzzzz
-          :assign_public_ip: DISABLED
+      :service_definition:
+        :service_name: httpd-fargate
+        :desired_count: 1
+        :deployment_configuration:
+          :maximum_percent: 100
+          :minimum_healthy_percent: 0
+        :launch_type: FARGATE
+        :network_configuration:
+          :awsvpc_configuration:
+            :subnets:
+              - subnet-xxxxxxxx
+              - subnet-yyyyyyyy
+            :security_groups:
+              - sg-zzzzzzzz
+            :assign_public_ip: DISABLED
       :task_definition:
         :family: staging-httpd-fargate
         :task_role_arn: 'arn:aws:iam::xxxxxxxxxx:role/ecsTaskExecutionRole'
