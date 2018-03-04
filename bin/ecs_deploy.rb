@@ -25,7 +25,6 @@ class EcsDeploy
     @exclude_service.uniq!
     @service = service
     @container = container
-    @service_task_map = gen_service_task_map
     @region = region
     @action = action
     @image = image
@@ -54,17 +53,6 @@ class EcsDeploy
     end
   rescue AwsECS::EcsException => e
     @log.error(e.message)
-  end
-
-  def gen_service_task_map
-    service_task_map = []
-    @config[:services].each do |service|
-      map = {}
-      map['task_definition'] = service.delete(:task_definition)
-      map['service_definition'] = service
-      service_task_map << map
-    end
-    service_task_map
   end
 
   def modify_container_image(container_definitions:)
@@ -153,7 +141,7 @@ class EcsDeploy
   end
 
   def ecs_image_update
-    services = @service ? [@service] : @config[:services].collect { |c| c[:service_name] }
+    services = @service ? [@service] : @config[:cluster_definition].collect { |c| c[:service_definition][:service_name] }
     services.reject! { |service| @exclude_service.include?(service) }
     @log.error { 'No service to deploy!' } if services.empty?
     service_info_maps = []
@@ -202,9 +190,9 @@ class EcsDeploy
   end
 
   def ecs_create_service
-    @service_task_map.each do |m|
-      service_definition = m['service_definition']
-      task_definition = m['task_definition']
+    @config[:cluster_definition].each do |m|
+      service_definition = m[:service_definition]
+      task_definition = m[:task_definition]
       service_name = service_definition[:service_name]
       @log.info { "Registering task definition for service : #{service_name}" }
       task_definition_arn = register_task_definition(task_definition: task_definition)
@@ -251,8 +239,8 @@ if __FILE__ == $PROGRAM_NAME
                 unless valid_actions.include?(opts[:action])
 
   Trollop.die :image, 'Provide docker image' \
-                unless opts[:image] || \
-                       opts[:action] == 'update-image'
+                if opts[:image].nil? && \
+                   opts[:action] == 'update-image'
 
   Trollop.die :config, 'Provide config file path for the ecs cluster' \
                 unless opts[:config]
