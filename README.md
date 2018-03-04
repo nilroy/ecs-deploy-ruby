@@ -19,6 +19,7 @@ Currently the tool supports following actions:
 
 - update of ECS service/ multiple ECS services with new docker image of container running in a task (Supports FARGATE)
 - create a ecs-cluster
+- create a ecs-cluster along with service and task definition
 
 ## Sample config.yml file
 
@@ -30,13 +31,17 @@ The tool requires a config file in YML format. An example config file:
     -
   :exclude_service:
     -
-  :image_repo: '<docker_image_repo>'
-  :services:
+  :cluster_definition:
     -
-      service_name: service1
+      :service_defintion:
+        service_name: 'service1'
+      :task_definition:
+        <task defintion>
     -
-      service_name: service2
-
+      :service_defintion:
+        service_name: 'service2'
+      :task_definition:
+        <task defintion>
 :staging:
   <<: *defaults
   :ecs_cluster: 'staging-cluster'
@@ -59,7 +64,7 @@ bundle exec bin/ecs_deploy.rb --env perf --config <path to config file> --action
 ## Updating image of a running task
 
 ```
-bundle exec bin/ecs_deploy.rb --env perf --config <path to config file> --revision <revision to deploy> --action update-image
+bundle exec bin/ecs_deploy.rb --env perf --config <path to config file> --image <image to deploy> --action update-image
 ```
 
 # Future development
