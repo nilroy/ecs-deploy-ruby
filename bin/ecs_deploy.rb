@@ -60,7 +60,7 @@ class EcsDeploy
     container_definitions.each do |container_definition|
       container_definition_clone = container_definition.clone
       container_definition_clone[:image] = @image
-      @log.info { "Modified the image for container #{container_definition_clone[:name]} to use imahe : #{@image}" }
+      @log.info { "Modified the image for container #{container_definition_clone[:name]} to use image : #{@image}" }
       new_container_definitions << container_definition_clone
     end
     new_container_definitions
