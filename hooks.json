@@ -1,0 +1,7 @@
+[
+  {
+    "id": "deploy",
+    "execute-command": "bundle exec bin/ecs_deploy.rb",
+    "command-working-directory": "/srv/ecsdeploy"
+  }
+]

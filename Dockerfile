@@ -30,7 +30,8 @@ RUN apt-get update && apt-get install -y \
     patch \
     pkg-config \
     fakeroot \
-    libssl-dev
+    libssl-dev \
+    webhook
 
 RUN gem install bundler && \
     pip install awscli
@@ -43,7 +44,7 @@ COPY . /srv/ecsdeploy
 
 WORKDIR /srv/ecsdeploy
 
-RUN bundle install --path vendor/bundle && \
+RUN bundle install --binstubs --path vendor/bundle && \
     chown -R ecsdeploy:ecsdeploy /srv/ecsdeploy && \
     chmod -R 755 /srv/ecsdeploy
 
